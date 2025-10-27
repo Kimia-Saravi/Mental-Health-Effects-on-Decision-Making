@@ -1,0 +1,52 @@
+* Load data
+* Drop missing on required variables
+drop if missing(YEAR) | missing(SERIAL) | missing(NHISHID) | missing(REGION) | missing(PERNUM) | ///
+    missing(NHISPID) | missing(HHX) | missing(AGE) | missing(SEX) | missing(MARSTCUR) | missing(RACENEW) | ///
+    missing(HISPETH) | missing(HISPRACE) | missing(HISPYN) | missing(SASPPHISP) | missing(EDUC) | ///
+    missing(DELAYCOST) | missing(YDELAYMENTAL) | missing(DELAYINS) | missing(DELAYLONG) | missing(WORMEDBILL) | ///
+    missing(YDELAYMEDYR) | missing(YSKIMPMEDYR) | missing(YSKIPMEDYR) | missing(HIPROBPAYR) | missing(HIUNABLEPAY) | ///
+    missing(ANXIETYEV) | missing(WORFREQ) | missing(WORRX) | missing(WORFEELEVL) | missing(GADANX) | ///
+    missing(GADWORCTRL) | missing(GADWORMUCH) | missing(GADRELAX) | missing(GADRSTLS) | missing(GADANNOY) | ///
+    missing(GADFEAR) | missing(GADCAT) | missing(DEPFREQ) | missing(DEPRX) | missing(DEPFEELEVL) | ///
+    missing(PHQINTR) | missing(PHQDEP) | missing(PHQSLEEP) | missing(PHQENGY) | missing(PHQEAT) | ///
+    missing(PHQBAD) | missing(PHQCONC) | missing(PHQMOVE) | missing(PHQCAT)
+
+* Keep valid outcome and ranges
+keep if YDELAYMEDYR == 1 | YDELAYMEDYR == 2
+keep if DEPFREQ     >= 1 & DEPFREQ     <= 5
+keep if DEPRX       >= 1 & DEPRX       <= 2
+keep if DEPFEELEVL  >= 1 & DEPFEELEVL  <= 3
+keep if PHQINTR     >= 0 & PHQINTR     <= 3
+keep if PHQDEP      >= 0 & PHQDEP      <= 3
+keep if PHQSLEEP    >= 0 & PHQSLEEP    <= 3
+keep if PHQENGY     >= 0 & PHQENGY     <= 3
+keep if PHQEAT      >= 0 & PHQEAT      <= 3
+keep if PHQBAD      >= 0 & PHQBAD      <= 3
+keep if PHQCONC     >= 0 & PHQCONC     <= 3
+keep if PHQMOVE     >= 0 & PHQMOVE     <= 3
+keep if PHQCAT      >= 1 & PHQCAT      <= 4
+
+* Recode outcome to 0/1
+replace YDELAYMEDYR = 0 if YDELAYMEDYR == 1
+replace YDELAYMEDYR = 1 if YDELAYMEDYR == 2
+
+* Logistic models (progressive trims)
+logit YDELAYMEDYR DEPFREQ DEPRX DEPFEELEVL PHQINTR PHQDEP PHQSLEEP PHQENGY PHQEAT PHQBAD PHQCONC PHQMOVE PHQCAT
+logit YDELAYMEDYR DEPFREQ DEPRX DEPFEELEVL PHQINTR PHQSLEEP PHQENGY PHQEAT PHQBAD PHQCONC PHQMOVE PHQCAT
+logit YDELAYMEDYR DEPFREQ DEPRX DEPFEELEVL PHQINTR PHQSLEEP PHQENGY PHQEAT PHQBAD PHQCONC PHQMOVE
+logit YDELAYMEDYR DEPFREQ DEPRX DEPFEELEVL PHQSLEEP PHQENGY PHQEAT PHQBAD PHQCONC PHQMOVE
+logit YDELAYMEDYR DEPFREQ DEPFEELEVL PHQSLEEP PHQENGY PHQEAT PHQBAD PHQCONC PHQMOVE
+logit YDELAYMEDYR DEPFREQ DEPFEELEVL PHQENGY PHQEAT PHQBAD PHQCONC PHQMOVE
+logit YDELAYMEDYR DEPFREQ PHQENGY PHQEAT PHQBAD PHQCONC PHQMOVE
+
+* Predicted probabilities and mean threshold classification
+predict yi_logit    // Pr(YDELAYMEDYR)
+summarize yi_logit
+local mean_yi = r(mean)
+gen yi_binary = .
+replace yi_binary = 0 if yi_logit < `mean_yi'
+replace yi_binary = 1 if yi_logit >= `mean_yi'
+
+* Confusion tabulation
+tabulate yi_binary YDELAYMEDYR
+
